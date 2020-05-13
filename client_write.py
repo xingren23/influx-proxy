@@ -15,8 +15,8 @@ BASEURL = 'http://localhost:6666'
 
 
 def once():
-    s = '''cpu,host=server01,region=uswest value=1 1434055562000000000
-cpu value=3,value2=4 1434055562000010000
+    s = '''cpu,host=server01,region=uswest value=0.000000 1434055562000000002
+cpu value=3,value2=4 1434055562000010002
 temperature,machine=unit42,type=assembly internal=32,external=100 1434055562000000035
 temperature,machine=unit143,type=assembly internal=22,external=130 1434055562005000035'''
     resp = requests.post(

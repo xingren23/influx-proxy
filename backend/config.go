@@ -16,6 +16,11 @@ import (
 
 const (
 	VERSION = "1.1"
+
+	REDIS_DEFAULT_NODE = "influx-proxy:node:default_node"
+	REDIS_NODES = "influx-proxy:node:"
+	REDIS_MEASUREMENT = "influx-proxy:measurement:"
+	REDIS_BACKEND = "influx-proxy:backend:"
 )
 
 var (
@@ -89,7 +94,7 @@ func NewRedisConfigSource(options *redis.Options, node string) (rcs *RedisConfig
 }
 
 func (rcs *RedisConfigSource) LoadNode() (nodecfg NodeConfig, err error) {
-	val, err := rcs.client.HGetAll("default_node").Result()
+	val, err := rcs.client.HGetAll(REDIS_DEFAULT_NODE).Result()
 	if err != nil {
 		log.Printf("redis load error: b:%s", rcs.node)
 		return
@@ -101,7 +106,7 @@ func (rcs *RedisConfigSource) LoadNode() (nodecfg NodeConfig, err error) {
 		return
 	}
 
-	val, err = rcs.client.HGetAll("n:" + rcs.node).Result()
+	val, err = rcs.client.HGetAll(REDIS_NODES + rcs.node).Result()
 	if err != nil {
 		log.Printf("redis load error: b:%s", rcs.node)
 		return
@@ -119,7 +124,7 @@ func (rcs *RedisConfigSource) LoadNode() (nodecfg NodeConfig, err error) {
 func (rcs *RedisConfigSource) LoadBackends() (backends map[string]*BackendConfig, err error) {
 	backends = make(map[string]*BackendConfig)
 
-	names, err := rcs.client.Keys("b:*").Result()
+	names, err := rcs.client.Keys(REDIS_BACKEND + "*").Result()
 	if err != nil {
 		log.Printf("read redis error: %s", err)
 		return
@@ -127,7 +132,7 @@ func (rcs *RedisConfigSource) LoadBackends() (backends map[string]*BackendConfig
 
 	var cfg *BackendConfig
 	for _, name := range names {
-		name = name[2:len(name)]
+		name = name[len(REDIS_BACKEND):len(name)]
 		cfg, err = rcs.LoadConfigFromRedis(name)
 		if err != nil {
 			log.Printf("read redis config error: %s", err)
@@ -140,7 +145,7 @@ func (rcs *RedisConfigSource) LoadBackends() (backends map[string]*BackendConfig
 }
 
 func (rcs *RedisConfigSource) LoadConfigFromRedis(name string) (cfg *BackendConfig, err error) {
-	val, err := rcs.client.HGetAll("b:" + name).Result()
+	val, err := rcs.client.HGetAll(REDIS_BACKEND + name).Result()
 	if err != nil {
 		log.Printf("redis load error: b:%s", name)
 		return
@@ -176,7 +181,7 @@ func (rcs *RedisConfigSource) LoadConfigFromRedis(name string) (cfg *BackendConf
 func (rcs *RedisConfigSource) LoadMeasurements() (m_map map[string][]string, err error) {
 	m_map = make(map[string][]string, 0)
 
-	names, err := rcs.client.Keys("m:*").Result()
+	names, err := rcs.client.Keys(REDIS_MEASUREMENT + "*").Result()
 	if err != nil {
 		log.Printf("read redis error: %s", err)
 		return
@@ -188,7 +193,7 @@ func (rcs *RedisConfigSource) LoadMeasurements() (m_map map[string][]string, err
 		if err != nil {
 			return
 		}
-		m_map[key[2:len(key)]], err = rcs.client.LRange(key, 0, length).Result()
+		m_map[key[len(REDIS_MEASUREMENT):len(key)]], err = rcs.client.LRange(key, 0, length).Result()
 		if err != nil {
 			return
 		}

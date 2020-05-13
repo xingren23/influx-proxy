@@ -37,7 +37,6 @@ type Backends struct {
 func NewBackends(cfg *BackendConfig, name string) (bs *Backends, err error) {
 	bs = &Backends{
 		HttpBackend: NewHttpBackend(cfg),
-		// FIXME: path...
 		Interval:        cfg.Interval,
 		RewriteInterval: cfg.RewriteInterval,
 		running:         true,
@@ -47,7 +46,10 @@ func NewBackends(cfg *BackendConfig, name string) (bs *Backends, err error) {
 		rewriter_running: false,
 		MaxRowLimit:      int32(cfg.MaxRowLimit),
 	}
-	bs.fb, err = NewFileBackend(name)
+
+	// FIXME: dque代替filebackend
+	dataPath := "./data/"
+	bs.fb, err = NewFileBackend(dataPath + name)
 	if err != nil {
 		return
 	}

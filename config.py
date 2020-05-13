@@ -8,6 +8,8 @@
 '''
 from __future__ import absolute_import, division,\
     print_function, unicode_literals
+
+import json
 import sys
 import getopt
 import redis
@@ -63,7 +65,7 @@ KEYMAPS = {
 NODES = {
     'l1': { 
         'listenaddr': ':6666',
-        'db': 'test',
+        'db': 'testopenfalcon',
         'zone': 'local',
         'interval':10,
         'idletimeout':10,
@@ -100,7 +102,7 @@ def write_config(client, d, name):
 
 
 def main():
-    optlist, args = getopt.getopt(sys.argv[1:], 'd:hH:p:P:')
+    optlist, args = getopt.getopt(sys.argv[1:], 'd:hH:p:P:c:')
     optdict = dict(optlist)
 
     if '-h' in optdict:
@@ -114,12 +116,19 @@ def main():
         password=optdict.get('-P', '')
     )
 
-    cleanups(client, ['default_node', 'b:*', 'm:*', 'n:*'])
+    with open(optdict.get("-c", "config.json")) as f:
+        data = json.load(f)
+        if "backends" in data:
+            BACKENDS = data['backends']
+        if "keymaps" in data:
+            KEYMAPS = data['keymaps']
 
-    write_config(client, DEFAULT_NODE, "default_node")
-    write_configs(client, BACKENDS, 'b:')
-    write_configs(client, NODES, 'n:')
-    write_configs(client, KEYMAPS, 'm:')
+    cleanups(client, ['default_node', 'influx-proxy:backend:*', 'influx-proxy:measurement:*', 'influx-proxy:node:*'])
+
+    write_config(client, DEFAULT_NODE, "influx-proxy:node:default_node")
+    write_configs(client, BACKENDS, 'influx-proxy:backend:')
+    write_configs(client, NODES, 'influx-proxy:node:')
+    write_configs(client, KEYMAPS, 'influx-proxy:measurement:')
 
 
 if __name__ == '__main__':

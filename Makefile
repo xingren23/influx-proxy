@@ -11,7 +11,8 @@ all: build
 
 build:
 	mkdir -p bin
-	go build -o bin/influx-proxy github.com/shell909090/influx-proxy/service
+	#env GOOS=linux GOARCH=amd64 go build -o bin/influx-proxy github.com/shell909090/influx-proxy
+	go build -o bin/influx-proxy github.com/shell909090/influx-proxy
 
 test:
 	go test -v github.com/shell909090/influx-proxy/backend

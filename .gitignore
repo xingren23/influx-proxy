@@ -2,3 +2,8 @@ bin
 testbk*
 *.dat
 *.rec
+
+data
+.idea
+.DS_Store
+

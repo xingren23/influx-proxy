@@ -13,10 +13,13 @@ import (
 	"os"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/shell909090/influx-proxy/backend"
+	"github.com/shell909090/influx-proxy/service"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 	redis "gopkg.in/redis.v5"
 
-	"github.com/shell909090/influx-proxy/backend"
+
 )
 
 var (
@@ -32,7 +35,7 @@ var (
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
 
-	flag.StringVar(&LogFilePath, "log-file-path", "/var/log/influx-proxy.log", "output file")
+	flag.StringVar(&LogFilePath, "log-file-path", "", "output file")
 	flag.StringVar(&ConfigFile, "config", "", "config file")
 	flag.StringVar(&NodeName, "node", "l1", "node name")
 	flag.StringVar(&RedisAddr, "redis", "localhost:6379", "config file")
@@ -107,8 +110,9 @@ func main() {
 	ic := backend.NewInfluxCluster(rcs, &nodecfg)
 	ic.LoadConfig()
 
+	// TODO : 使用gin代替mux路由
 	mux := http.NewServeMux()
-	NewHttpService(ic, nodecfg.DB).Register(mux)
+	service.NewHttpService(ic, nodecfg.DB).Register(mux)
 
 	log.Printf("http service start.")
 	server := &http.Server{
@@ -119,9 +123,12 @@ func main() {
 	if nodecfg.IdleTimeout <= 0 {
 		server.IdleTimeout = 10 * time.Second
 	}
+
 	err = server.ListenAndServe()
 	if err != nil {
 		log.Print(err)
 		return
 	}
+
+
 }

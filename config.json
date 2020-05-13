@@ -1,0 +1,22 @@
+{
+  "backends": {
+    "192.168.2.30": {
+      "url": "http://192.168.2.30:8086",
+      "db": "testopenfalcon",
+      "zone": "local",
+      "interval": 1000,
+      "timeout": 10000,
+      "timeoutquery": 600000,
+      "maxrowlimit": 10000,
+      "checkinterval": 1000,
+      "rewriteinterval": 10000
+    }
+  },
+  "keymaps": {
+    "tcp": [
+      "192.168.2.30"
+    ],
+    "_default_": [
+    ]
+  }
+}
