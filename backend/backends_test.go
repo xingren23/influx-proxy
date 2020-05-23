@@ -45,7 +45,8 @@ func TestRewrite(t *testing.T) {
 	}
 	defer bs.Close()
 	for i := 0; i < 100; i++ {
-		err := bs.fb.Write([]byte("cpu value=3,value2=4 1434055562000010000"))
+		//err := bs.fb.Write([]byte("cpu value=3,value2=4 1434055562000010000"))
+		err := bs.qb.Enqueue([]byte("cpu value=3,value2=4 1434055562000010000"))
 		if err != nil {
 			t.Errorf("error: %s", err)
 			return

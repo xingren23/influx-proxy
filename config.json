@@ -10,13 +10,40 @@
       "maxrowlimit": 10000,
       "checkinterval": 1000,
       "rewriteinterval": 10000
+    },
+    "127.0.0.1": {
+      "url": "http://127.0.0.1:8086",
+      "db": "test",
+      "zone": "local",
+      "interval": 1000,
+      "timeout": 10000,
+      "timeoutquery": 600000,
+      "maxrowlimit": 10000,
+      "checkinterval": 1000,
+      "rewriteinterval": 10000
     }
   },
   "keymaps": {
     "tcp": [
       "192.168.2.30"
     ],
+    "influxdb.cluster" : [
+      "127.0.0.1"
+    ],
     "_default_": [
     ]
+  },
+  "nodes": {
+    "l1": {
+      "listenaddr": ":6666",
+      "db": "testopenfalcon",
+      "zone": "local",
+      "interval": 10,
+      "idletimeout": 5,
+      "readtimeout": 5,
+      "writetimeout": 5,
+      "writetracing": 0,
+      "querytracing": 0
+    }
   }
 }

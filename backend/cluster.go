@@ -69,7 +69,7 @@ type InfluxCluster struct {
 	query_executor Querier
 	ForbiddenQuery []*regexp.Regexp
 	ObligatedQuery []*regexp.Regexp
-	cfgsrc         *RedisConfigSource
+	Cfgsrc         *RedisConfigSource
 	bas            []BackendAPI
 	backends       map[string]BackendAPI
 	m2bs           map[string][]BackendAPI // measurements to backends
@@ -99,7 +99,7 @@ func NewInfluxCluster(cfgsrc *RedisConfigSource, nodecfg *NodeConfig) (ic *Influ
 		Zone:           nodecfg.Zone,
 		nexts:          nodecfg.Nexts,
 		query_executor: &InfluxQLExecutor{},
-		cfgsrc:         cfgsrc,
+		Cfgsrc:         cfgsrc,
 		bas:            make([]BackendAPI, 0),
 		stats:          &Statistics{},
 		counter:        &Statistics{},
@@ -219,7 +219,7 @@ func (ic *InfluxCluster) AddNext(ba BackendAPI) {
 func (ic *InfluxCluster) loadBackends() (backends map[string]BackendAPI, bas []BackendAPI, err error) {
 	backends = make(map[string]BackendAPI)
 
-	bkcfgs, err := ic.cfgsrc.LoadBackends()
+	bkcfgs, err := ic.Cfgsrc.LoadBackends()
 	if err != nil {
 		return
 	}
@@ -250,7 +250,7 @@ func (ic *InfluxCluster) loadBackends() (backends map[string]BackendAPI, bas []B
 func (ic *InfluxCluster) loadMeasurements(backends map[string]BackendAPI) (m2bs map[string][]BackendAPI, err error) {
 	m2bs = make(map[string][]BackendAPI)
 
-	m_map, err := ic.cfgsrc.LoadMeasurements()
+	m_map, err := ic.Cfgsrc.LoadMeasurements()
 	if err != nil {
 		return
 	}
@@ -462,7 +462,7 @@ func (ic *InfluxCluster) WriteRow(line []byte) {
 
 	bs, ok := ic.GetBackends(key)
 	if !ok {
-		log.Printf("new measurement: %s\n", key)
+		log.Printf("invalid measurement: %s\n", key)
 		atomic.AddInt64(&ic.stats.PointsWrittenFail, 1)
 		// TODO: new measurement?
 		return

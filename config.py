@@ -69,6 +69,8 @@ NODES = {
         'zone': 'local',
         'interval':10,
         'idletimeout':10,
+        'readtimeout':10,
+        'writetimeout':10,
         'writetracing':0,
         'querytracing':0,
     }
@@ -122,6 +124,8 @@ def main():
             BACKENDS = data['backends']
         if "keymaps" in data:
             KEYMAPS = data['keymaps']
+        if "nodes" in data:
+            NODES = data['nodes']
 
     cleanups(client, ['default_node', 'influx-proxy:backend:*', 'influx-proxy:measurement:*', 'influx-proxy:node:*'])
 

@@ -8,17 +8,21 @@ import (
 	"bytes"
 	"io"
 	"log"
+	"os"
 	"sync"
 	"time"
+
+	"github.com/toolkits/file"
 )
 
 const (
-	WRITE_QUEUE = 16
+	BATCH_SIZE = 16
 )
 
 type Backends struct {
 	*HttpBackend
-	fb              *FileBackend
+	//fb              *FileBackend
+	qb              *QueueBackend
 	Interval        int
 	RewriteInterval int
 	MaxRowLimit     int32
@@ -36,7 +40,7 @@ type Backends struct {
 // maybe ch_timer is not the best way.
 func NewBackends(cfg *BackendConfig, name string) (bs *Backends, err error) {
 	bs = &Backends{
-		HttpBackend: NewHttpBackend(cfg),
+		HttpBackend:     NewHttpBackend(cfg),
 		Interval:        cfg.Interval,
 		RewriteInterval: cfg.RewriteInterval,
 		running:         true,
@@ -47,9 +51,13 @@ func NewBackends(cfg *BackendConfig, name string) (bs *Backends, err error) {
 		MaxRowLimit:      int32(cfg.MaxRowLimit),
 	}
 
-	// FIXME: dque代替filebackend
-	dataPath := "./data/"
-	bs.fb, err = NewFileBackend(dataPath + name)
+	dataPath := file.SelfDir() + "/data/"
+	if !file.IsExist(dataPath) {
+		os.MkdirAll(dataPath, os.FileMode(os.ModePerm))
+		log.Println("mkdirall ", dataPath)
+	}
+	//bs.fb, err = NewFileBackend(dataPath + name)
+	bs.qb, err = NewQueueBackend(name, dataPath, true)
 	if err != nil {
 		return
 	}
@@ -67,7 +75,8 @@ func (bs *Backends) worker() {
 				bs.Flush()
 				bs.wg.Wait()
 				bs.HttpBackend.Close()
-				bs.fb.Close()
+				//bs.fb.Close()
+				bs.qb.Close()
 				return
 			}
 			bs.WriteBuffer(p)
@@ -77,7 +86,8 @@ func (bs *Backends) worker() {
 			if !bs.running {
 				bs.wg.Wait()
 				bs.HttpBackend.Close()
-				bs.fb.Close()
+				//bs.fb.Close()
+				bs.qb.Close()
 				return
 			}
 
@@ -184,7 +194,8 @@ func (bs *Backends) Flush() {
 			log.Printf("write http error: %s\n", err)
 		}
 
-		err = bs.fb.Write(p)
+		//err = bs.fb.Write(p)
+		err = bs.qb.Enqueue(p)
 		if err != nil {
 			log.Printf("write file error: %s\n", err)
 		}
@@ -196,7 +207,8 @@ func (bs *Backends) Flush() {
 }
 
 func (bs *Backends) Idle() {
-	if !bs.rewriter_running && bs.fb.IsData() {
+	//if !bs.rewriter_running && bs.fb.IsData() {
+	if !bs.rewriter_running && bs.qb.Size() > 0 {
 		bs.rewriter_running = true
 		go bs.RewriteLoop()
 	}
@@ -205,7 +217,8 @@ func (bs *Backends) Idle() {
 }
 
 func (bs *Backends) RewriteLoop() {
-	for bs.fb.IsData() {
+	//for bs.fb.IsData() {
+	for bs.qb.Size() > 0 {
 		if !bs.running {
 			return
 		}
@@ -223,7 +236,8 @@ func (bs *Backends) RewriteLoop() {
 }
 
 func (bs *Backends) Rewrite() (err error) {
-	p, err := bs.fb.Read()
+	//p, err := bs.fb.Read()
+	p, err := bs.qb.Peek()
 	if err != nil {
 		return
 	}
@@ -243,18 +257,26 @@ func (bs *Backends) Rewrite() (err error) {
 		err = nil
 	default:
 		log.Printf("unknown error %s, maybe overloaded.", err)
+		//err = bs.fb.RollbackMeta()
+		//if err != nil {
+		//	log.Printf("rollback meta error: %s\n", err)
+		//}
 
-		err = bs.fb.RollbackMeta()
-		if err != nil {
-			log.Printf("rollback meta error: %s\n", err)
-		}
+		time.Sleep(100 * time.Duration(time.Millisecond))
 		return
 	}
 
-	err = bs.fb.UpdateMeta()
+	//err = bs.fb.UpdateMeta()
+	//if err != nil {
+	//	log.Printf("update meta error: %s\n", err)
+	//	return
+	//}
+
+	p, err = bs.qb.Dequeue()
 	if err != nil {
-		log.Printf("update meta error: %s\n", err)
+		log.Println("dequeue item error :#{err}")
 		return
 	}
+
 	return
 }

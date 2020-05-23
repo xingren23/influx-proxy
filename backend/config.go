@@ -17,10 +17,10 @@ import (
 const (
 	VERSION = "1.1"
 
-	REDIS_DEFAULT_NODE = "influx-proxy:node:default_node"
-	REDIS_NODES = "influx-proxy:node:"
-	REDIS_MEASUREMENT = "influx-proxy:measurement:"
-	REDIS_BACKEND = "influx-proxy:backend:"
+	RedisDefaultNode = "influx-proxy:node:default_node"
+	RedisNodes       = "influx-proxy:node:"
+	RedisMeasurement = "influx-proxy:measurement:"
+	RedisBackend     = "influx-proxy:backend:"
 )
 
 var (
@@ -56,27 +56,29 @@ func LoadStructFromMap(data map[string]string, o interface{}) (err error) {
 }
 
 type NodeConfig struct {
-	ListenAddr   string
-	DB           string
-	Zone         string
-	Nexts        string
-	Interval     int
-	IdleTimeout  int
-	WriteTracing int
-	QueryTracing int
+	ListenAddr   string `json:"listenaddr"`
+	DB           string `json:"db"`
+	Zone         string `json:"zone"`
+	Nexts        string `json:"-"`
+	Interval     int    `json:"interval"`
+	IdleTimeout  int    `json:"idletimeout"`
+	WriteTimeout int    `json:"writetimeout"`
+	ReadTimeout  int    `json:"readtimeout"`
+	WriteTracing int    `json:"writetracing"`
+	QueryTracing int    `json:"querytracing"`
 }
 
 type BackendConfig struct {
-	URL             string
-	DB              string
-	Zone            string
-	Interval        int
-	Timeout         int
-	TimeoutQuery    int
-	MaxRowLimit     int
-	CheckInterval   int
-	RewriteInterval int
-	WriteOnly       int
+	URL             string `json:"url"`
+	DB              string `json:"db"`
+	Zone            string `json:"zone"`
+	Interval        int    `json:"interval"`
+	Timeout         int    `json:"timeout"`
+	TimeoutQuery    int    `json:"querytimeout"`
+	MaxRowLimit     int    `json:"maxrowlimit"`
+	CheckInterval   int    `json:"checkinterval"`
+	RewriteInterval int    `json:"rewriteinterval"`
+	WriteOnly       int    `json:"writeonly"`
 }
 
 type RedisConfigSource struct {
@@ -94,7 +96,7 @@ func NewRedisConfigSource(options *redis.Options, node string) (rcs *RedisConfig
 }
 
 func (rcs *RedisConfigSource) LoadNode() (nodecfg NodeConfig, err error) {
-	val, err := rcs.client.HGetAll(REDIS_DEFAULT_NODE).Result()
+	val, err := rcs.client.HGetAll(RedisDefaultNode).Result()
 	if err != nil {
 		log.Printf("redis load error: b:%s", rcs.node)
 		return
@@ -106,7 +108,7 @@ func (rcs *RedisConfigSource) LoadNode() (nodecfg NodeConfig, err error) {
 		return
 	}
 
-	val, err = rcs.client.HGetAll(REDIS_NODES + rcs.node).Result()
+	val, err = rcs.client.HGetAll(RedisNodes + rcs.node).Result()
 	if err != nil {
 		log.Printf("redis load error: b:%s", rcs.node)
 		return
@@ -124,7 +126,7 @@ func (rcs *RedisConfigSource) LoadNode() (nodecfg NodeConfig, err error) {
 func (rcs *RedisConfigSource) LoadBackends() (backends map[string]*BackendConfig, err error) {
 	backends = make(map[string]*BackendConfig)
 
-	names, err := rcs.client.Keys(REDIS_BACKEND + "*").Result()
+	names, err := rcs.client.Keys(RedisBackend + "*").Result()
 	if err != nil {
 		log.Printf("read redis error: %s", err)
 		return
@@ -132,7 +134,7 @@ func (rcs *RedisConfigSource) LoadBackends() (backends map[string]*BackendConfig
 
 	var cfg *BackendConfig
 	for _, name := range names {
-		name = name[len(REDIS_BACKEND):len(name)]
+		name = name[len(RedisBackend):len(name)]
 		cfg, err = rcs.LoadConfigFromRedis(name)
 		if err != nil {
 			log.Printf("read redis config error: %s", err)
@@ -145,7 +147,7 @@ func (rcs *RedisConfigSource) LoadBackends() (backends map[string]*BackendConfig
 }
 
 func (rcs *RedisConfigSource) LoadConfigFromRedis(name string) (cfg *BackendConfig, err error) {
-	val, err := rcs.client.HGetAll(REDIS_BACKEND + name).Result()
+	val, err := rcs.client.HGetAll(RedisBackend + name).Result()
 	if err != nil {
 		log.Printf("redis load error: b:%s", name)
 		return
@@ -178,10 +180,10 @@ func (rcs *RedisConfigSource) LoadConfigFromRedis(name string) (cfg *BackendConf
 	return
 }
 
-func (rcs *RedisConfigSource) LoadMeasurements() (m_map map[string][]string, err error) {
-	m_map = make(map[string][]string, 0)
+func (rcs *RedisConfigSource) LoadMeasurements() (mMap map[string][]string, err error) {
+	mMap = make(map[string][]string, 0)
 
-	names, err := rcs.client.Keys(REDIS_MEASUREMENT + "*").Result()
+	names, err := rcs.client.Keys(RedisMeasurement + "*").Result()
 	if err != nil {
 		log.Printf("read redis error: %s", err)
 		return
@@ -193,11 +195,70 @@ func (rcs *RedisConfigSource) LoadMeasurements() (m_map map[string][]string, err
 		if err != nil {
 			return
 		}
-		m_map[key[len(REDIS_MEASUREMENT):len(key)]], err = rcs.client.LRange(key, 0, length).Result()
+		mMap[key[len(RedisMeasurement):len(key)]], err = rcs.client.LRange(key, 0, length).Result()
 		if err != nil {
 			return
 		}
 	}
-	log.Printf("%d measurements loaded from redis.", len(m_map))
+	log.Printf("%d measurements loaded from redis.", len(mMap))
 	return
+}
+
+func (rcs *RedisConfigSource) DeleteMeasurement(measurement string) error {
+	mKey := RedisMeasurement + measurement
+	_, err := rcs.client.Del(mKey).Result()
+	if err != nil {
+		log.Printf("delete measurement %s error: #{err}", mKey)
+	}
+
+	log.Printf("delete measurement %s", mKey)
+	return err
+}
+
+func (rcs *RedisConfigSource) DeleteBackend(backend string) error {
+	mKey := RedisBackend + backend
+	_, err := rcs.client.Del(mKey).Result()
+	if err != nil {
+		log.Printf("delete backend %s error: #{err}", mKey)
+	}
+
+	log.Printf("delete backend %s", mKey)
+	return err
+}
+
+func (rcs *RedisConfigSource) UpdateMeasurement(mMap map[string][]string) error {
+	for key, value := range mMap {
+		mKey := RedisMeasurement + key
+		for item := range value {
+			_, err := rcs.client.RPush(mKey, item).Result()
+			if err != nil {
+				log.Printf("update measurement #{mMap} error: #{err}")
+			}
+		}
+	}
+
+	log.Printf("update measurement #{mMap} to redis.")
+	return nil
+}
+
+func (rcs *RedisConfigSource) UpdateBackend(backends map[string]BackendConfig) error {
+	for key, backend := range backends {
+		bKey := RedisBackend + key
+		t := reflect.TypeOf(backend)
+		v := reflect.ValueOf(backend)
+		for i := 0; i < v.NumField(); i++ {
+			if v.Field(i).CanInterface() { //判断是否为可导出字段
+				// 转为小写
+				filedKey := strings.ToLower(t.Field(i).Name)
+				value := v.Field(i).Interface()
+
+				_, err := rcs.client.HSet(bKey, filedKey, value).Result()
+				if err != nil {
+					log.Printf("update backend #{backends} error: #{err}")
+				}
+			}
+		}
+	}
+	log.Printf("update backend #{backends} to redis.")
+	return nil
 }

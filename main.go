@@ -5,15 +5,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"log"
+	"math"
 	"net/http"
 	"os"
+	"os/signal"
 	"time"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gorilla/mux"
+
 	"github.com/shell909090/influx-proxy/backend"
 	"github.com/shell909090/influx-proxy/service"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
@@ -75,6 +79,10 @@ func initLog() {
 }
 
 func main() {
+
+	// the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m
+	wait := time.Second * 15
+
 	initLog()
 
 	var err error
@@ -110,25 +118,44 @@ func main() {
 	ic := backend.NewInfluxCluster(rcs, &nodecfg)
 	ic.LoadConfig()
 
-	// TODO : 使用gin代替mux路由
-	mux := http.NewServeMux()
-	service.NewHttpService(ic, nodecfg.DB).Register(mux)
+	// http.SeverMux 替换为 gorilla/mux，后者支持Method
+	r := mux.NewRouter()
+	service.NewHttpService(ic, nodecfg.DB).Register(r)
 
-	log.Printf("http service start.")
-	server := &http.Server{
+	srv := &http.Server{
 		Addr:        nodecfg.ListenAddr,
-		Handler:     mux,
-		IdleTimeout: time.Duration(nodecfg.IdleTimeout) * time.Second,
-	}
-	if nodecfg.IdleTimeout <= 0 {
-		server.IdleTimeout = 10 * time.Second
-	}
-
-	err = server.ListenAndServe()
-	if err != nil {
-		log.Print(err)
-		return
+		// Good practice to set timeouts to avoid Slowloris attacks.
+		WriteTimeout: time.Second * time.Duration(math.Max(float64(nodecfg.WriteTimeout),3)),
+		ReadTimeout:  time.Second * time.Duration(math.Max(float64(nodecfg.ReadTimeout), 3)),
+		IdleTimeout:  time.Second * time.Duration(math.Max(float64(nodecfg.IdleTimeout), 3)),
+		Handler: r, // Pass our instance of gorilla/mux in.
 	}
 
+	// Run our server in a goroutine so that it doesn't block.
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			log.Println(err)
+		}
+	}()
+
+	c := make(chan os.Signal, 1)
+	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
+	// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
+	signal.Notify(c, os.Interrupt)
+
+	// Block until we receive our signal.
+	<-c
+
+	// Create a deadline to wait for.
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	// Doesn't block if no connections, but will otherwise wait
+	// until the timeout deadline.
+	srv.Shutdown(ctx)
+	// Optionally, you could run srv.Shutdown in a goroutine and block on
+	// <-ctx.Done() if your application should wait for other services
+	// to finalize based on context cancellation.
+	log.Println("shutting down")
+	os.Exit(0)
 
 }
